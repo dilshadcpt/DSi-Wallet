@@ -128,3 +128,12 @@ export async function getToken(clientId, { silent = false } = {}) {
     client.requestAccessToken({ prompt: silent ? '' : 'consent' });
   });
 }
+
+// The app's own lists, named the way the sync expects. Transactions are kept in S.txs in the app.
+export function localState(S) {
+  return {
+    projects: S.projects || [], accounts: S.accounts || [], loans: S.loans || [], advances: S.advances || [],
+    funding: S.funding || [], parties: S.parties || [], budgets: S.budgets || [], plans: S.plans || [],
+    statements: S.statements || [], transactions: S.txs || [],
+  };
+}

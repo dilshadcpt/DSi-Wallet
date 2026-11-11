@@ -13,7 +13,7 @@ import { duesNow, advanceViews, fundingViews, budgetViews, planViews, partyViews
 import { loanSchedule } from './loan-math.js';
 import { toDMY, fromDMY, ALL_RANGE, monthRange, yearRange } from './format.js';
 import { ledgerFor } from './records.js';
-import { mergeState, duesFile, driveClient, getToken, TABLES } from './drive-sync.js';
+import { mergeState, duesFile, driveClient, getToken, localState, TABLES } from './drive-sync.js';
 
 const cfg = window.WALLET_CONFIG || {};
 const APP = cfg.appName || 'DSi Digital';
@@ -949,7 +949,7 @@ async function sync(manual = false) {
   try {
     drive = driveClient(token.token);
     const remote = await drive.readData();
-    const local = Object.fromEntries(TABLES.map(t => [t, S[t] || []]));
+    const local = localState(S);
     const { state, backup } = mergeState(local, remote);
     for (const t of TABLES) await putMany(t, state[t]);
     await drive.writeData(backup);
