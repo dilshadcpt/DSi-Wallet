@@ -941,7 +941,7 @@ async function sync(manual = false) {
   if (!navigator.onLine) { if (manual) setStatus('Offline. Changes will sync when you reconnect.'); return; }
   if (!tokenValid()) {
     try { token = await getToken(cfg.googleClientId, { silent: !manual }); }
-    catch (_) { setStatus('Tap "Sync now" in More to reconnect Google Drive.'); return; }
+    catch (_) { setStatus('Saved on this device. Open More and tap Sync now to send it to Google Drive.'); return; }
   }
   if (syncing) return;
   syncing = true;
