@@ -1,2 +1,2 @@
 # DSi-Wallet
-A personal Wallet Manager
+A Personal Wallet Manager
