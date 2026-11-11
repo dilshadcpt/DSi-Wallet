@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b5d7a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>DSi Wallet</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1 id="appTitle">DSi Wallet</h1>
+    <span id="status" class="status" role="status"></span>
+  </header>
+
+  <main id="main"></main>
+
+  <button id="fab" class="fab" aria-label="Add transaction">+</button>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="home">Home</button>
+    <button class="tab" data-view="txs">Transactions</button>
+    <button class="tab" data-view="accounts">Accounts</button>
+    <button class="tab" data-view="more">More</button>
+  </nav>
+
+  <dialog id="txDialog">
+    <form id="txForm" class="stack">
+      <h2 id="txTitle">New transaction</h2>
+      <div class="seg">
+        <label><input type="radio" name="type" value="expense" checked>Expense</label>
+        <label><input type="radio" name="type" value="income">Income</label>
+        <label><input type="radio" name="type" value="transfer">Transfer</label>
+      </div>
+      <label>Amount <span class="cur" id="txCurrency"></span>
+        <input name="amount" inputmode="decimal" placeholder="0.000" required>
+      </label>
+      <label>Account<select name="account_id" required></select></label>
+      <label id="toWrap" hidden>To account<select name="to_account_id"></select></label>
+      <label>Date<input type="date" name="date" required></label>
+      <label>Category<input name="category" list="catList" placeholder="e.g. Food, Rent, Salary" maxlength="80"></label>
+      <datalist id="catList"></datalist>
+      <label id="partyWrap">Party (optional)<select name="party_id"></select></label>
+      <label id="advWrap">Advance or loan (optional)<select name="advance_id"></select></label>
+      <label id="planWrap">Investment plan (optional)<select name="plan_id"></select></label>
+      <label id="stmtWrap" hidden>Card statement being paid (optional)<select name="statement_id"></select></label>
+      <label>Note<input name="note" placeholder="Optional" maxlength="500"></label>
+      <p id="txError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="txDelete" class="danger" hidden>Delete</button>
+        <span class="grow"></span>
+        <button type="button" id="txCancel" class="ghost">Cancel</button>
+        <button class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="accDialog">
+    <form id="accForm" class="stack">
+      <h2 id="accTitle">New account</h2>
+      <label>Project
+        <select name="project_id" required></select>
+      </label>
+      <label>Name<input name="name" placeholder="e.g. NBB current" maxlength="80" required></label>
+      <label>Currency <span class="cur" id="accCur"></span></label>
+      <label>Type
+        <select name="kind">
+          <option value="bank">Bank account</option>
+          <option value="cash">Cash</option>
+          <option value="card">Credit card</option>
+          <option value="od">Overdraft account</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Opening balance<input name="opening" inputmode="decimal" placeholder="0.000"></label>
+      <div id="odWrap" class="two" hidden>
+        <label>Overdraft limit<input name="od_limit" inputmode="decimal" placeholder="0.000"></label>
+        <label>Interest a year (%)<input name="od_rate" inputmode="decimal" placeholder="9.75"></label>
+      </div>
+      <label id="odStartWrap" hidden>Overdraft start date<input type="date" name="od_start"></label>
+      <div id="cardWrap" class="two" hidden>
+        <label>Statement day<input name="statement_day" inputmode="numeric" placeholder="1-31"></label>
+        <label>Payment due day<input name="due_day" inputmode="numeric" placeholder="1-31"></label>
+      </div>
+      <label id="limitWrap" hidden>Credit limit<input name="credit_limit" inputmode="decimal" placeholder="optional"></label>
+      <p id="accHint" class="muted"></p>
+      <p id="accError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="accDelete" class="danger" hidden>Delete</button>
+        <span class="grow"></span>
+        <button type="button" id="accCancel" class="ghost">Cancel</button>
+        <button class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="projDialog">
+    <form id="projForm" class="stack">
+      <h2 id="projTitle">New project</h2>
+      <label>Name<input name="name" placeholder="e.g. Bahrain personal" maxlength="80" required></label>
+      <label>Currency
+        <select name="currency">
+          <option value="BHD">BHD · Bahraini dinar</option>
+          <option value="INR">INR · Indian rupee</option>
+          <option value="USD">USD · US dollar</option>
+        </select>
+      </label>
+      <p id="projHint" class="muted"></p>
+      <p id="projError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="projDelete" class="danger" hidden>Delete</button>
+        <span class="grow"></span>
+        <button type="button" id="projCancel" class="ghost">Cancel</button>
+        <button class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="repDialog">
+    <form id="repForm" class="stack">
+      <h2>PDF report</h2>
+      <div class="seg two">
+        <label><input type="radio" name="kind" value="month" checked>Monthly statement</label>
+        <label><input type="radio" name="kind" value="account">Account statement</label>
+      </div>
+      <div id="repMonthWrap">
+        <label>Month<input type="month" name="month" required></label>
+      </div>
+      <div id="repAccWrap" hidden>
+        <label>Account<select name="account_id"></select></label>
+        <div class="two">
+          <label>From<input type="date" name="from"></label>
+          <label>To<input type="date" name="to"></label>
+        </div>
+      </div>
+      <p id="repError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="repCancel" class="ghost">Close</button>
+        <span class="grow"></span>
+        <button type="button" id="repSave" class="ghost">Save PDF</button>
+        <button class="primary">View PDF</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="impDialog">
+    <div class="stack">
+      <h2>Import from DSi Finance App</h2>
+      <div id="impBody" class="imp-body"></div>
+      <p id="impError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="impCancel" class="ghost">Cancel</button>
+        <span class="grow"></span>
+        <button type="button" id="impConfirm" class="primary">Import</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="xlsDialog">
+    <div class="stack">
+      <h2>Import from Excel</h2>
+      <div id="xlsBody" class="imp-body"></div>
+      <p id="xlsError" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="xlsCancel" class="ghost">Cancel</button>
+        <span class="grow"></span>
+        <button type="button" id="xlsConfirm" class="primary">Import</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="recDialog">
+    <div class="stack">
+      <div id="recBody" class="imp-body"></div>
+      <div class="actions"><span class="grow"></span><button type="button" id="recClose" class="ghost">Close</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="loanDialog">
+    <div class="stack">
+      <h2>Loan</h2>
+      <div id="loanBody" class="imp-body"></div>
+      <div class="actions"><span class="grow"></span><button type="button" id="loanClose" class="primary">Close</button></div>
+    </div>
+  </dialog>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</body>
+</html>

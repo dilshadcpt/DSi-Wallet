@@ -1,0 +1,116 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 3860 >>
+stream
+0 g BT /F2 18 Tf 40.00 784.00 Td (Monthly statement) Tj ET
+0.35 g BT /F1 9 Tf 40.00 765.00 Td (November 2026) Tj ET
+0.7 G 0.6 w 40 758.00 m 555 758.00 l S
+0 g BT /F2 12 Tf 40.00 732.00 Td (Summary by currency) Tj ET
+0.92 g 40 708.00 515 16 re f
+0 g BT /F2 9 Tf 40.00 713.00 Td (Currency) Tj ET
+0 g BT /F2 9 Tf 111.27 713.00 Td (Opening) Tj ET
+0 g BT /F2 9 Tf 226.80 713.00 Td (Income) Tj ET
+0 g BT /F2 9 Tf 325.73 713.00 Td (Expenses) Tj ET
+0 g BT /F2 9 Tf 516.27 713.00 Td (Closing) Tj ET
+0 g BT /F2 9 Tf 40.00 697.00 Td (BHD) Tj ET
+0 g BT /F1 9 Tf 117.47 697.00 Td (150.000) Tj ET
+0 g BT /F1 9 Tf 232.48 697.00 Td (70.000) Tj ET
+0 g BT /F1 9 Tf 342.48 697.00 Td (12.800) Tj ET
+0 g BT /F2 9 Tf 520.52 697.00 Td (207.200) Tj ET
+0 g BT /F2 9 Tf 40.00 681.00 Td (INR) Tj ET
+0 g BT /F1 9 Tf 117.47 681.00 Td (5000.00) Tj ET
+0 g BT /F1 9 Tf 242.49 681.00 Td (0.00) Tj ET
+0 g BT /F1 9 Tf 352.49 681.00 Td (7.00) Tj ET
+0 g BT /F2 9 Tf 520.52 681.00 Td (4993.00) Tj ET
+0 g BT /F2 12 Tf 40.00 646.00 Td (Accounts) Tj ET
+0.92 g 40 622.00 515 16 re f
+0 g BT /F2 9 Tf 40.00 627.00 Td (Account) Tj ET
+0 g BT /F2 9 Tf 230.00 627.00 Td (Currency) Tj ET
+0 g BT /F2 9 Tf 261.27 627.00 Td (Opening) Tj ET
+0 g BT /F2 9 Tf 346.48 627.00 Td (Net movement) Tj ET
+0 g BT /F2 9 Tf 516.27 627.00 Td (Closing) Tj ET
+0 g BT /F1 9 Tf 40.00 611.00 Td (NBB Current) Tj ET
+0 g BT /F1 9 Tf 230.00 611.00 Td (BHD) Tj ET
+0 g BT /F1 9 Tf 267.47 611.00 Td (150.000) Tj ET
+0 g BT /F1 9 Tf 377.22 611.00 Td (+27.200) Tj ET
+0 g BT /F2 9 Tf 520.52 611.00 Td (177.200) Tj ET
+0 g BT /F1 9 Tf 40.00 595.00 Td (Savings Cafe) Tj ET
+0 g BT /F1 9 Tf 230.00 595.00 Td (BHD) Tj ET
+0 g BT /F1 9 Tf 277.48 595.00 Td (0.000) Tj ET
+0 g BT /F1 9 Tf 377.22 595.00 Td (+30.000) Tj ET
+0 g BT /F2 9 Tf 525.83 595.00 Td (30.000) Tj ET
+0 g BT /F1 9 Tf 40.00 579.00 Td (India Family) Tj ET
+0 g BT /F1 9 Tf 230.00 579.00 Td (INR) Tj ET
+0 g BT /F1 9 Tf 267.47 579.00 Td (5000.00) Tj ET
+0 g BT /F1 9 Tf 389.49 579.00 Td (-7.00) Tj ET
+0 g BT /F2 9 Tf 520.52 579.00 Td (4993.00) Tj ET
+0 g BT /F2 12 Tf 40.00 544.00 Td (Transactions \(5\)) Tj ET
+0.92 g 40 520.00 515 16 re f
+0 g BT /F2 9 Tf 40.00 525.00 Td (Date) Tj ET
+0 g BT /F2 9 Tf 110.00 525.00 Td (Type) Tj ET
+0 g BT /F2 9 Tf 170.00 525.00 Td (Details) Tj ET
+0 g BT /F2 9 Tf 380.00 525.00 Td (Account) Tj ET
+0 g BT /F2 9 Tf 521.80 525.00 Td (Amount) Tj ET
+0 g BT /F1 9 Tf 40.00 509.00 Td (2026-11-02) Tj ET
+0 g BT /F1 9 Tf 110.00 509.00 Td (Expense) Tj ET
+0 g BT /F1 9 Tf 170.00 509.00 Td (Groceries - Carrefour \(very long..) Tj ET
+0 g BT /F1 9 Tf 380.00 509.00 Td (NBB Current) Tj ET
+0 g BT /F1 9 Tf 506.32 509.00 Td (-12.500 BHD) Tj ET
+0 g BT /F1 9 Tf 40.00 493.00 Td (2026-11-03) Tj ET
+0 g BT /F1 9 Tf 110.00 493.00 Td (Transfer) Tj ET
+0 g BT /F1 9 Tf 170.00 493.00 Td (To Savings Cafe) Tj ET
+0 g BT /F1 9 Tf 380.00 493.00 Td (NBB Current) Tj ET
+0 g BT /F1 9 Tf 509.32 493.00 Td (30.000 BHD) Tj ET
+0 g BT /F1 9 Tf 40.00 477.00 Td (2026-11-05) Tj ET
+0 g BT /F1 9 Tf 110.00 477.00 Td (Income) Tj ET
+0 g BT /F1 9 Tf 170.00 477.00 Td (Salary) Tj ET
+0 g BT /F1 9 Tf 380.00 477.00 Td (NBB Current) Tj ET
+0 g BT /F1 9 Tf 504.06 477.00 Td (+70.000 BHD) Tj ET
+0 g BT /F1 9 Tf 40.00 461.00 Td (2026-11-06) Tj ET
+0 g BT /F1 9 Tf 110.00 461.00 Td (Expense) Tj ET
+0 g BT /F1 9 Tf 170.00 461.00 Td (Rent) Tj ET
+0 g BT /F1 9 Tf 380.00 461.00 Td (India Family) Tj ET
+0 g BT /F1 9 Tf 516.33 461.00 Td (-7.00 INR) Tj ET
+0 g BT /F1 9 Tf 40.00 445.00 Td (2026-11-07) Tj ET
+0 g BT /F1 9 Tf 110.00 445.00 Td (Expense) Tj ET
+0 g BT /F1 9 Tf 170.00 445.00 Td (Dinner - Hotel "Grand") Tj ET
+0 g BT /F1 9 Tf 380.00 445.00 Td (NBB Current) Tj ET
+0 g BT /F1 9 Tf 511.32 445.00 Td (-0.300 BHD) Tj ET
+0.8 G 0.4 w 40 30.00 m 555 30.00 l S
+0.4 g BT /F1 8 Tf 40.00 18.00 Td (DSi Wallet | Statement for November 2026 | Generated 2026-11-10) Tj ET
+0.4 g BT /F1 8 Tf 511.59 18.00 Td (Page 1 of 1) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Title (DSi Wallet statement 2026-11) /Producer (DSi Wallet) /Creator (DSi Wallet) >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000212 00000 n 
+0000000314 00000 n 
+0000004226 00000 n 
+0000004362 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 7 0 R >>
+startxref
+4466
+%%EOF
