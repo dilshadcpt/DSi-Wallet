@@ -2,6 +2,7 @@
 // Sheets: Projects, Accounts, Transactions, Read me.
 // Import checks every row first. If any row has an error, nothing is saved.
 import { CURRENCIES, TYPES, toMinor, toPlain, balances, validateTx } from './core.js';
+import { toDMY } from './format.js';
 
 const PROJ_HEAD = ['ID', 'Name', 'Currency'];
 const ACC_HEAD = ['ID', 'Project', 'Name', 'Currency', 'Opening balance', 'Current balance', 'Type', 'Statement day', 'Due day', 'Credit limit'];
@@ -9,7 +10,7 @@ const KINDS = { bank: 'bank', 'bank account': 'bank', cash: 'cash', card: 'card'
 const TX_HEAD = ['ID', 'Date', 'Type', 'Amount', 'Currency', 'Account', 'To account', 'Category', 'Note', 'Fee', 'Received'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HELP = [
-  ['DSi Wallet · Excel data'], [''],
+  ['DSi Digital · Excel data'], [''],
   ['Projects sheet (project books)'],
   ['Name: unique project name. Currency: BHD, INR or USD. Each project holds one currency.'], [''],
   ['Accounts sheet'],
@@ -19,7 +20,7 @@ const HELP = [
   ['Current balance: for information only. It is ignored when you import.'],
   ['Type: Bank account, Cash, Credit card or Other. For a credit card, fill Statement day, Due day (1-31) and optionally Credit limit.'], [''],
   ['Transactions sheet'],
-  ['Date: YYYY-MM-DD, for example 2026-11-10. 10/11/2026 (day/month/year) is also accepted.'],
+  ['Date: DD-MM-YYYY, for example 10-11-2026.'],
   ['Type: Income, Expense or Transfer.'],
   ['Amount: a positive number. Up to 3 decimals for BHD, up to 2 for INR and USD. Use a dot for decimals.'],
   ['Account: the account name the money comes from or goes into.'],
@@ -50,7 +51,7 @@ export function buildWorkbook(XLSX, { projects = [], accounts = [], txs = [] }) 
     .map(t => {
       const a = byId.get(t.account_id), to = byId.get(t.to_account_id), cur = a?.currency || '';
       const recv = t.received != null && to ? Number(toPlain(t.received, to.currency)) : '';
-      return [t.id, t.date, cap(t.type), Number(toPlain(t.amount, cur)), cur, a?.name || '', to?.name || '', t.category || '', t.note || '',
+      return [t.id, toDMY(t.date), cap(t.type), Number(toPlain(t.amount, cur)), cur, a?.name || '', to?.name || '', t.category || '', t.note || '',
         t.fee ? Number(toPlain(t.fee, cur)) : '', recv];
     })];
 
@@ -112,9 +113,9 @@ export function parseDate(v) {
   const t = text(v);
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
   if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+  m = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(t);
   if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  throw new Error(`Date "${t}" must look like 2026-11-10`);
+  throw new Error(`Date "${t}" must look like 10-11-2026`);
 }
 
 // Returns { projects, accounts, transactions, errors, counts }. Rows are returned only when there are no errors.
@@ -126,7 +127,7 @@ export function parseWorkbook(XLSX, buffer, existing, { now = Date.now(), newId 
   const accRows = readSheet(XLSX, wb, 'Accounts');
   const txRows = readSheet(XLSX, wb, 'Transactions');
   if (projRows === null && accRows === null && txRows === null) {
-    throw new Error('This is not a DSi Wallet Excel file. It needs a "Projects", "Accounts" or "Transactions" sheet.');
+    throw new Error('This is not a DSi Digital Excel file. It needs a "Projects", "Accounts" or "Transactions" sheet.');
   }
 
   // ----- projects -----

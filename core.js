@@ -1,3 +1,4 @@
+import { toDMY } from './format.js';
 // Pure logic only (no DOM, no storage). Money is stored as whole minor units:
 // BHD = fils (1/1000), INR = paise (1/100), USD = cents (1/100).
 export const CURRENCIES = { BHD: 3, INR: 2, USD: 2 };
@@ -100,7 +101,7 @@ export function periodRange(p) {
 export function periodLabel(p) {
   if (p.mode === 'month') { const [y, m] = p.month.split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; }
   if (p.mode === 'year') return `Year ${p.year}`;
-  if (p.mode === 'custom') return `${p.from} to ${p.to}`;
+  if (p.mode === 'custom') return `${toDMY(p.from)} to ${toDMY(p.to)}`;
   return 'All dates';
 }
 
@@ -253,7 +254,7 @@ export function makeBackup(accounts, txs, projects = [], loans = [], more = {}) 
 export function parseBackup(text) {
   const d = JSON.parse(text);
   if (d.app !== 'dsi-wallet' || !Array.isArray(d.accounts) || !Array.isArray(d.transactions)) {
-    throw new Error('This file is not a DSi Wallet backup');
+    throw new Error('This file is not a DSi Digital backup');
   }
   if (!Array.isArray(d.projects)) d.projects = [];
   if (!Array.isArray(d.loans)) d.loans = [];
@@ -267,7 +268,7 @@ export function toCSV(txs, accounts) {
   const rows = [['date', 'type', 'amount', 'currency', 'account', 'to_account', 'category', 'note']];
   for (const t of txs.filter(x => !x.deleted).sort((a, b) => a.date.localeCompare(b.date))) {
     const a = byId.get(t.account_id) || {}, to = byId.get(t.to_account_id) || {};
-    rows.push([t.date, t.type, toPlain(t.amount, a.currency), a.currency || '', a.name || '', to.name || '', t.category, t.note]);
+    rows.push([toDMY(t.date), t.type, toPlain(t.amount, a.currency), a.currency || '', a.name || '', to.name || '', t.category, t.note]);
   }
   return '\uFEFF' + rows.map(r => r.map(q).join(',')).join('\r\n');
 }

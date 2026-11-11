@@ -1,5 +1,6 @@
 // Builds the PDF reports. Uses the same balance rules as the app screens.
 import { fmt, toPlain, balances, monthSummary } from './core.js';
+import { toDMY } from './format.js';
 import { Pdf } from './pdf.js';
 
 const parts = ym => ym.split('-').map(Number);
@@ -20,7 +21,7 @@ export function monthlyPdf({ accounts, txs, month, generated }) {
   const byId = new Map(accounts.map(a => [a.id, a]));
   const currencies = [...new Set(live.map(a => a.currency))].sort();
 
-  const pdf = new Pdf({ title: `DSi Wallet statement ${month}`, footer: `DSi Wallet · Statement for ${monthLabel(month)} · Generated ${generated}` });
+  const pdf = new Pdf({ title: `DSi Digital statement ${month}`, footer: `DSi Digital · Statement for ${monthLabel(month)} · Generated ${toDMY(generated)}` });
   pdf.titleBlock('Monthly statement', monthLabel(month));
 
   pdf.heading('Summary by currency');
@@ -61,7 +62,7 @@ export function monthlyPdf({ accounts, txs, month, generated }) {
     const details = t.type === 'transfer' ? `To ${to?.name || '?'}` : (t.category || '') + (t.note ? ' - ' + t.note : '');
     const amt = t.type === 'income' ? signed('+', t.amount, cur) : t.type === 'expense' ? signed('-', t.amount, cur) : money(t.amount, cur);
     pdf.row([
-      { x: L0, t: t.date }, { x: 110, t: type }, { x: 170, t: truncate(details, 34) },
+      { x: L0, t: toDMY(t.date) }, { x: 110, t: type }, { x: 170, t: truncate(details, 34) },
       { x: 380, t: truncate(a?.name || '', 16) }, { x: R0, t: `${amt} ${cur}`, align: 'right' },
     ]);
   }
@@ -78,9 +79,9 @@ export function accountPdf({ accounts, txs, accountId, from, to, generated }) {
       (t.account_id === accountId || t.to_account_id === accountId))
     .sort((a, b) => a.date.localeCompare(b.date) || a.updated_at - b.updated_at);
 
-  const pdf = new Pdf({ title: `DSi Wallet statement ${acc.name} ${from} to ${to}`, footer: `DSi Wallet · ${acc.name} · Generated ${generated}` });
-  pdf.titleBlock('Account statement', `${acc.name} (${cur})  ·  ${from} to ${to}`);
-  pdf.row([{ x: L0, t: `Opening balance on ${from}`, bold: true }, { x: R0, t: `${money(start, cur)} ${cur}`, align: 'right', bold: true }]);
+  const pdf = new Pdf({ title: `DSi Digital statement ${acc.name} ${toDMY(from)} to ${toDMY(to)}`, footer: `DSi Digital · ${acc.name} · Generated ${toDMY(generated)}` });
+  pdf.titleBlock('Account statement', `${acc.name} (${cur})  ·  ${toDMY(from)} to ${toDMY(to)}`);
+  pdf.row([{ x: L0, t: `Opening balance on ${toDMY(from)}`, bold: true }, { x: R0, t: `${money(start, cur)} ${cur}`, align: 'right', bold: true }]);
   pdf.gap(4);
   pdf.setHeader([{ x: L0, t: 'Date' }, { x: 100, t: 'Description' }, { x: 370, t: 'Money out', align: 'right' }, { x: 450, t: 'Money in', align: 'right' }, { x: R0, t: 'Balance', align: 'right' }]);
 
@@ -96,7 +97,7 @@ export function accountPdf({ accounts, txs, accountId, from, to, generated }) {
     if (t.note) desc += ' - ' + t.note;
     bal += inn - out; totalIn += inn; totalOut += out;
     pdf.row([
-      { x: L0, t: t.date }, { x: 100, t: truncate(desc, 44) },
+      { x: L0, t: toDMY(t.date) }, { x: 100, t: truncate(desc, 44) },
       { x: 370, t: out ? money(out, cur) : '', align: 'right' },
       { x: 450, t: inn ? money(inn, cur) : '', align: 'right' },
       { x: R0, t: money(bal, cur), align: 'right' },
@@ -105,7 +106,7 @@ export function accountPdf({ accounts, txs, accountId, from, to, generated }) {
   pdf.gap(6);
   pdf.rule();
   pdf.row([{ x: L0, t: 'Totals for period', bold: true }, { x: 370, t: money(totalOut, cur), align: 'right', bold: true }, { x: 450, t: money(totalIn, cur), align: 'right', bold: true }]);
-  pdf.row([{ x: L0, t: `Closing balance on ${to}`, bold: true }, { x: R0, t: `${money(bal, cur)} ${cur}`, align: 'right', bold: true }]);
+  pdf.row([{ x: L0, t: `Closing balance on ${toDMY(to)}`, bold: true }, { x: R0, t: `${money(bal, cur)} ${cur}`, align: 'right', bold: true }]);
   return pdf.build();
 }
 

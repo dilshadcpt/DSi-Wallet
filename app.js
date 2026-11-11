@@ -11,14 +11,17 @@ import { loanView } from './loan-bridge.js';
 import { overdraftView } from './od-bridge.js';
 import { duesNow, advanceViews, fundingViews, budgetViews, planViews, partyViews, cardViews, paymentSplitFor, checkFunding } from './records.js';
 import { loanSchedule } from './loan-math.js';
+import { toDMY, fromDMY, ALL_RANGE, monthRange, yearRange } from './format.js';
+import { ledgerFor } from './records.js';
 import { mergeState, duesFile, driveClient, getToken, TABLES } from './drive-sync.js';
 
 const cfg = window.WALLET_CONFIG || {};
-const APP = cfg.appName || 'DSi Wallet';
+const APP = cfg.appName || 'DSi Digital';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const todayStr = () => new Date().toLocaleDateString('en-CA');
+const dmy = iso => toDMY(iso);
 const shiftMonth = (m, n) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + n, 1)).toISOString().slice(0, 7); };
 
 const today = todayStr();
@@ -131,7 +134,7 @@ function periodBar() {
     </select>
     ${p.mode === 'month' ? `<input type="month" id="perMonth" value="${p.month}" aria-label="Month">` : ''}
     ${p.mode === 'year' ? `<select id="perYear" aria-label="Year">${years.map(y => `<option ${String(y) === p.year ? 'selected' : ''}>${y}</option>`).join('')}</select>` : ''}
-    ${p.mode === 'custom' ? `<input type="date" id="perFrom" value="${p.from}" aria-label="From"><input type="date" id="perTo" value="${p.to}" aria-label="To">` : ''}
+    ${p.mode === 'custom' ? `<input type="text" id="perFrom" value="${toDMY(p.from)}" placeholder="DD-MM-YYYY" aria-label="From date"><input type="text" id="perTo" value="${toDMY(p.to)}" placeholder="DD-MM-YYYY" aria-label="To date">` : ''}
   </div>${bad}`;
 }
 
@@ -150,7 +153,7 @@ function txRow(t) {
   const title = t.type === 'transfer'
     ? `${esc(a?.name)} → ${esc(to?.name)}`
     : esc(t.category || (t.type === 'income' ? 'Income' : 'Expense'));
-  const sub = [t.date, t.note && esc(t.note), t.type !== 'transfer' && esc(a?.name), esc(projName(a?.project_id))].filter(Boolean).join(' · ');
+  const sub = [toDMY(t.date), t.note && esc(t.note), t.type !== 'transfer' && esc(a?.name), esc(projName(a?.project_id))].filter(Boolean).join(' · ');
   return `<button class="row tx ${t.type}" data-act="edit-tx" data-id="${t.id}">
     <div><b>${title}</b><small>${sub}</small></div>
     <span>${sign}${fmt(t.amount, a?.currency)}</span></button>`;
@@ -181,7 +184,7 @@ function homeView() {
     groups.set(key, g);
   }
   const duesHtml = groups.size ? `<section><h2>Payments due soon</h2>${[...groups.values()].map(g => `
-    <div class="row due"><div><b>${esc(g.name)}</b><small>${kindLabel[g.kind] || 'Payment'}${g.overdue ? ' · ' + g.overdue + ' overdue (from ' + g.first + ')' : ''}${g.next ? ' · next ' + g.next.date + (g.next.days === 0 ? ' (today)' : ' in ' + g.next.days + ' day(s)') : ''}</small></div>
+    <div class="row due"><div><b>${esc(g.name)}</b><small>${kindLabel[g.kind] || 'Payment'}${g.overdue ? ' · ' + g.overdue + ' overdue (from ' + toDMY(g.first) + ')' : ''}${g.next ? ' · next ' + toDMY(g.next.date) + (g.next.days === 0 ? ' (today)' : ' in ' + g.next.days + ' day(s)') : ''}</small></div>
     <span class="out">${fmt(g.total, g.currency)}</span></div>`).join('')}</section>` : '';
   return `
     <div class="toolbar">${projectSelect()}</div>
@@ -202,7 +205,7 @@ function txListHtml() {
   for (const t of list) {
     if (t.date !== last) {
       last = t.date;
-      html += `<h3>${new Date(t.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</h3>`;
+      html += `<h3>${toDMY(t.date)}</h3>`;
     }
     html += txRow(t);
   }
@@ -227,8 +230,8 @@ function accountsView() {
       <span>${a.kind === 'card' ? 'Owed ' + fmt(-(bal.get(a.id) || 0), a.currency) : fmt(bal.get(a.id), a.currency)}</span></button>`).join('');
   const odRows = accountsIn(S.accounts, pid).filter(a => a.od || a.kind === 'od').map(a => {
     const v = overdraftView(a, S.projects, S.accounts, S.txs, today);
-    return `<div class="row"><div><b>${esc(a.name)}</b><small>Limit ${fmt(a.od?.limit ?? 0, a.currency)} · rate ${a.od?.rate ?? '-'}% · used ${fmt(v.used, a.currency)}</small></div>
-      <span>Interest ${fmt(v.interest, a.currency)}</span></div>`;
+    return `<button class="row" data-act="open-od" data-id="${a.id}"><div><b>${esc(a.name)}</b><small>Limit ${fmt(a.od?.limit ?? 0, a.currency)} · rate ${a.od?.rate ?? '-'}% · used ${fmt(v.used, a.currency)}</small></div>
+      <span>Interest ${fmt(v.interest, a.currency)}</span></button>`;
   }).join('');
   const loanRows = S.loans.filter(l => !l.deleted && (pid === 'all' || l.project === pid)).map(l => {
     const cur = projById(l.project)?.currency;
@@ -311,7 +314,12 @@ function moreView() {
         <input type="file" id="restoreFile" accept="application/json,.json" hidden>
       </div>
     </section>
-    <section><p class="muted">${esc(APP)} · version 1.2</p></section>`;
+    <section>
+      <h2>About</h2>
+      <p class="about"><b>DSi Digital</b><br>Code | Content | Commerce</p>
+      <p class="about"><span>Smart Software</span><span>Educational Media</span><span>Accounting Tools</span></p>
+      <p class="muted">${esc(APP)} · version 2.1</p>
+    </section>`;
 }
 
 // ---------- Transaction form ----------
@@ -342,7 +350,7 @@ function updateTxForm(preferTo) {
   sel(f.elements.party_id, S.parties.filter(p => !p.deleted && p.currency === cur).map(p => [p.id, p.name]), 'No party');
   sel(f.elements.advance_id, S.advances.filter(x => !x.deleted && x.project === projId).map(x => [x.id, x.name + ' (' + x.kind + ')']), 'No advance or loan');
   sel(f.elements.plan_id, S.plans.filter(x => !x.deleted && x.project === projId).map(x => [x.id, x.name]), 'No investment plan');
-  sel(f.elements.statement_id, S.statements.filter(x => !x.deleted && toAcc && x.card === toAcc.id).map(x => [x.id, 'Statement ' + x.statementDate + ' · due ' + x.dueDate + ' · ' + x.amount]), 'Not paying a statement');
+  sel(f.elements.statement_id, S.statements.filter(x => !x.deleted && toAcc && x.card === toAcc.id).map(x => [x.id, 'Statement ' + toDMY(x.statementDate) + ' · due ' + toDMY(x.dueDate) + ' · ' + x.amount]), 'Not paying a statement');
   void proj;
   if (isTransfer) {
     const options = liveAccounts().filter(a => a.currency === cur && a.id !== from);
@@ -361,7 +369,7 @@ function openTx(t = null, type = 'expense') {
   f.elements.type.value = t?.type || type;
   const first = pid !== 'all' ? liveAccounts().find(a => a.project_id === pid) : liveAccounts()[0];
   f.elements.account_id.innerHTML = accOptions(t?.account_id || first?.id);
-  f.elements.date.value = t?.date || todayStr();
+  f.elements.date.value = toDMY(t?.date || todayStr());
   f.elements.amount.value = t ? toPlain(t.amount, curOf(t.account_id)) : '';
   f.elements.category.value = t?.category || '';
   f.elements.note.value = t?.note || '';
@@ -397,7 +405,7 @@ async function saveTx(e) {
       ...prev,
       id: f.dataset.id || crypto.randomUUID(),
       type,
-      date: f.elements.date.value,
+      date: fromDMY(f.elements.date.value),
       amount,
       account_id: from,
       to_account_id: to ? to.id : null,
@@ -451,7 +459,7 @@ function openAcc(a = null) {
   f.elements.credit_limit.value = a?.credit_limit != null ? toPlain(a.credit_limit, a.currency) : '';
   f.elements.od_limit.value = a?.od ? toPlain(a.od.limit, a.currency) : '';
   f.elements.od_rate.value = a?.od?.rate ?? '';
-  f.elements.od_start.value = a?.od?.start || '';
+  f.elements.od_start.value = a?.od?.start ? toDMY(a.od.start) : '';
   toggleCardFields();
   const hasTx = a && S.txs.some(t => !t.deleted && (t.account_id === a.id || t.to_account_id === a.id));
   $('#accHint').textContent = hasTx
@@ -483,8 +491,8 @@ function odFromForm(f, cur) {
   const limit = f.elements.od_limit.value.trim(), rate = Number(f.elements.od_rate.value), start = f.elements.od_start.value;
   if (!limit) throw new Error('Enter the overdraft limit');
   if (!(rate > 0)) throw new Error('Enter the interest rate a year, for example 9.75');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) throw new Error('Choose the overdraft start date');
-  return { limit: toMinor(limit, cur), rate, basis: 365, start };
+  if (!start) throw new Error('Choose the overdraft start date');
+  return { limit: toMinor(limit, cur), rate, basis: 365, start: fromDMY(start) };
 }
 
 async function saveAcc(e) {
@@ -532,6 +540,90 @@ async function deleteAcc() {
   render();
 }
 
+// ---------- Overdraft detail ----------
+function openOd(id) {
+  const acc = accById(id);
+  if (!acc || !acc.od) return;
+  const cur = acc.currency, d = CURRENCIES[cur];
+  const v = overdraftView(acc, S.projects, S.accounts, S.txs, today);
+  const money = x => fmt(Math.round(x * 10 ** d), '');
+  const rows = v.segments.map(s => `<tr><td>${toDMY(s.from)}</td><td>${toDMY(s.to)}</td><td class="num">${s.days}</td><td class="num">${money(s.used)}</td><td class="num">${money(s.interest)}</td></tr>`).join('');
+  $('#recBody').innerHTML = `
+    <h2>${esc(acc.name)}</h2>
+    <p class="muted">${esc(projName(acc.project_id))} · ${cur} · rate ${acc.od.rate}% a year · from ${toDMY(acc.od.start)}</p>
+    <div class="stats">
+      <div class="stat"><span>Limit</span><b>${fmt(acc.od.limit, cur)}</b></div>
+      <div class="stat"><span>Used today</span><b>${fmt(v.used, cur)}</b></div>
+      <div class="stat"><span>Available</span><b>${fmt(v.available, cur)}</b></div>
+      <div class="stat"><span>Interest charged</span><b>${fmt(v.interest, cur)}</b></div>
+    </div>
+    <h3>Interest by period</h3>
+    ${rows ? `<div class="ledger-table"><table class="tbl"><thead><tr><th>From</th><th>To</th><th class="num">Days</th><th class="num">Used</th><th class="num">Interest</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<p class="muted">No overdraft periods yet.</p>'}
+    <p class="muted">Interest uses the old DSi Finance App's rules, on a 365-day year.</p>
+    <div class="actions"><span class="grow"></span><button class="ghost" data-rec-close>Close</button></div>`;
+  $('#recDialog').dataset.type = 'od';
+  $('#recDialog').showModal();
+}
+
+// ---------- Ledger: every movement of one record, with a date range ----------
+const LEDGER_PRESETS = [['month', 'This month'], ['year', 'This year'], ['custom', 'Custom'], ['all', 'All dates']];
+let ledgerState = null;
+
+function ledgerRange() {
+  const st = ledgerState;
+  if (st.preset === 'month') return monthRange(today.slice(0, 7));
+  if (st.preset === 'year') return yearRange(today.slice(0, 4));
+  if (st.preset === 'all') return ALL_RANGE;
+  return { from: st.from, to: st.to };
+}
+
+function openLedger(type, id) {
+  ledgerState = { type, id, preset: 'year', from: `${today.slice(0, 4)}-01-01`, to: today, err: '' };
+  renderLedger();
+  $('#recDialog').dataset.type = type;
+  $('#recDialog').showModal();
+}
+
+function renderLedger() {
+  const st = ledgerState;
+  const L = ledgerFor(S, st.type, st.id, ledgerRange());
+  const dis = x => fmt(x, '');
+  const head = L ? `${esc(L.title)} · ${L.currency}` : 'Record not found';
+  const bodyRows = L ? L.rows.map(r => `<tr><td>${toDMY(r.date)}</td><td>${esc(r.desc)}</td><td class="num">${r.debit ? dis(r.debit) : ''}</td><td class="num">${r.credit ? dis(r.credit) : ''}</td><td class="num">${dis(r.balance)}</td></tr>`).join('') : '';
+  $('#recBody').innerHTML = `
+    <div class="actions"><button class="ghost" data-rec-list="${st.type}">Back</button></div>
+    <h2>Ledger · ${head}</h2>
+    <p class="muted">${st.type === 'funding' ? 'Balance shows what is still to come.' : st.type === 'budget' ? 'Balance shows what is left of the budget.' : 'Balance is the running total.'}</p>
+    <div class="ledger-controls">
+      ${LEDGER_PRESETS.map(([k, l]) => `<button data-led-preset="${k}" class="${st.preset === k ? 'on' : ''}">${l}</button>`).join('')}
+    </div>
+    <div class="ledger-controls">
+      <input type="text" id="led-from" value="${toDMY(st.from)}" placeholder="DD-MM-YYYY" aria-label="From date" ${st.preset === 'custom' ? '' : 'disabled'}>
+      <input type="text" id="led-to" value="${toDMY(st.to)}" placeholder="DD-MM-YYYY" aria-label="To date" ${st.preset === 'custom' ? '' : 'disabled'}>
+    </div>
+    <p id="led-err" class="error" role="alert">${esc(st.err)}</p>
+    ${L ? `<p class="muted">Balance brought forward: <b>${dis(L.opening)}</b></p>
+    <div class="ledger-table"><table class="tbl"><thead><tr><th>Date</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead>
+      <tbody>${bodyRows || '<tr><td colspan="5" class="muted">No movements in this period.</td></tr>'}</tbody>
+      <tfoot><tr><th colspan="2">Totals for the period</th><th class="num">${dis(L.totals.debit)}</th><th class="num">${dis(L.totals.credit)}</th><th class="num">${dis(L.closing)}</th></tr></tfoot></table></div>`
+      : ''}`;
+}
+
+document.addEventListener('click', e => {
+  const t = e.target;
+  if (t.dataset.ledPreset) { ledgerState.preset = t.dataset.ledPreset; ledgerState.err = ''; renderLedger(); return; }
+  if (t.dataset.recClose !== undefined) return $('#recDialog').close();
+});
+document.addEventListener('change', e => {
+  if (!ledgerState || (e.target.id !== 'led-from' && e.target.id !== 'led-to')) return;
+  try {
+    ledgerState[e.target.id === 'led-from' ? 'from' : 'to'] = fromDMY(e.target.value);
+    ledgerState.err = '';
+  } catch (err) { ledgerState.err = err.message; }
+  renderLedger();
+});
+
 // ---------- Loan detail ----------
 function loanPayForm(l, cur, v) {
   const next = v.remaining[0];
@@ -541,10 +633,10 @@ function loanPayForm(l, cur, v) {
   const due = Math.round(next.payment * 10 ** CURRENCIES[cur]);
   return `<form id="loanPayForm" class="stack">
     <h3>Record a payment</h3>
-    <label>Instalment due<select name="due">${v.remaining.slice(0, 24).map(r => `<option value="${r.date}">${r.date} · ${toPlain(Math.round(r.payment * 10 ** CURRENCIES[cur]), cur)}</option>`).join('')}</select></label>
+    <label>Instalment due<select name="due">${v.remaining.slice(0, 24).map(r => `<option value="${r.date}">${toDMY(r.date)} · ${toPlain(Math.round(r.payment * 10 ** CURRENCIES[cur]), cur)}</option>`).join('')}</select></label>
     <label>Amount paid <span class="cur">${cur}</span><input name="amount" inputmode="decimal" value="${toPlain(due, cur)}" required></label>
     <label>Paid from<select name="account_id">${accounts.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></label>
-    <label>Date<input type="date" name="date" value="${today}" required></label>
+    <label>Date<input type="text" name="date" value="${toDMY(today)}" placeholder="DD-MM-YYYY" required></label>
     <p id="loanPayError" class="error" role="alert"></p>
     <div class="actions"><span class="grow"></span><button class="primary">Save payment</button></div>
   </form>`;
@@ -561,7 +653,7 @@ document.addEventListener('submit', async e => {
     const split = paymentSplitFor(S, loanId, f.elements.due.value, amount);
     const acc = accById(f.elements.account_id.value);
     const t = {
-      id: crypto.randomUUID(), type: 'expense', date: f.elements.date.value, amount, account_id: acc.id, to_account_id: null,
+      id: crypto.randomUUID(), type: 'expense', date: fromDMY(f.elements.date.value), amount, account_id: acc.id, to_account_id: null,
       category: 'Loan repayment', note: l.name, party_id: null, advance_id: null, plan_id: null,
       source_type: 'Loan repayment', project_id: l.project, loan_id: l.id, adjustment: false,
       principal: split.principal, interest: split.interest, due_date: f.elements.due.value,
@@ -581,9 +673,13 @@ function openLoan(id) {
   $('#loanDialog').dataset.id = id;
   const cur = projById(l.project)?.currency;
   const v = loanView(l, S.projects, S.txs, today);
-  const rows = v.remaining.slice(0, 12).map(r => `<tr><td>${r.date}</td><td class="r">${toPlain(Math.round(r.payment * 10 ** CURRENCIES[cur]), cur)}</td><td class="r">${toPlain(Math.round(r.interest * 10 ** CURRENCIES[cur]), cur)}</td><td class="r">${toPlain(Math.round(r.principal * 10 ** CURRENCIES[cur]), cur)}</td><td class="r">${toPlain(Math.round(r.closing * 10 ** CURRENCIES[cur]), cur)}</td></tr>`).join('');
+  const d = CURRENCIES[cur];
+  const paidDates = new Set(S.txs.filter(t => !t.deleted && t.loan_id === id && t.due_date).map(t => t.due_date));
+  const status = r => paidDates.has(r.date) ? ['Paid', 'status-paid'] : (r.date < today ? ['Overdue', 'status-overdue'] : ['Upcoming', 'status-up']);
+  const money = x => fmt(Math.round(x * 10 ** d), '');
+  const rows = v.schedule.map(r => { const [label, cls] = status(r); return `<tr><td>${toDMY(r.date)}</td><td class="num">${money(r.payment)}</td><td class="num">${money(r.interest)}</td><td class="num">${money(r.principal)}</td><td class="num">${money(r.closing)}</td><td class="${cls}">${label}</td></tr>`; }).join('');
   $('#loanBody').innerHTML = `
-    <p class="muted">${esc(projName(l.project))} · ${cur}</p>
+    <p class="muted">${esc(projName(l.project))} · ${cur} · ${l.mode === 'emi' ? 'EMI ' + fmt(l.emi, cur) : 'no fixed schedule'}</p>
     <div class="stats">
       <div class="stat"><span>Outstanding principal</span><b>${v.principal == null ? '-' : fmt(v.principal, cur)}</b></div>
       <div class="stat"><span>Interest accrued to today</span><b>${v.accrued == null ? '-' : fmt(v.accrued, cur)}</b></div>
@@ -591,10 +687,9 @@ function openLoan(id) {
       <div class="stat"><span>Interest not yet paid</span><b>${v.unpaidInterest == null ? '-' : fmt(v.unpaidInterest, cur)}</b></div>
     </div>
     ${v.reason ? `<p class="error">${esc(v.reason)}</p>` : ''}
-    <h3>Next instalments</h3>
-    ${v.remaining.length ? `<table class="tbl"><thead><tr><th>Due</th><th class="r">EMI</th><th class="r">Interest</th><th class="r">Principal</th><th class="r">Balance after</th></tr></thead><tbody>${rows}</tbody></table>`
-      : '<p class="muted">Nothing left to pay on a fixed schedule.</p>'}
-    <p class="muted">The schedule uses the same rules as the old DSi Finance App.</p>
+    <h3>EMI schedule</h3>
+    ${v.schedule.length ? `<div class="ledger-table"><table class="tbl"><thead><tr><th>Due</th><th class="num">EMI</th><th class="num">Interest</th><th class="num">Principal</th><th class="num">Balance after</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<p class="muted">No fixed schedule for this loan.</p>'}
     ${loanPayForm(l, cur, v)}`;
   $('#loanDialog').showModal();
 }
@@ -624,7 +719,7 @@ function recInput(fd, rec, pid0) {
   if (fd.t === 'card') return `<select name="${fd.k}">${liveAccounts().filter(a => a.kind === 'card').map(a => `<option value="${a.id}" ${v === a.id ? 'selected' : ''}>${esc(a.name)} (${a.currency})</option>`).join('')}</select>`;
   if (fd.t === 'cur') return `<select name="${fd.k}">${['BHD', 'INR', 'USD'].map(c => `<option ${v === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
   if (fd.t === 'select') return `<select name="${fd.k}">${fd.opts.map(([x, l]) => `<option value="${x}" ${v === x ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
-  if (fd.t === 'date') return `<input type="date" name="${fd.k}" value="${esc(v || '')}" id="${id}">`;
+  if (fd.t === 'date') return `<input type="text" name="${fd.k}" value="${esc(toDMY(v || ''))}" placeholder="DD-MM-YYYY" id="${id}">`;
   if (fd.t === 'number') return `<input type="number" min="1" max="31" name="${fd.k}" value="${esc(v ?? '')}">`;
   if (fd.t === 'money') return `<input name="${fd.k}" inputmode="decimal" value="${esc(v != null && typeof v === 'number' ? '' : '')}" data-minor="${v ?? ''}">`;
   return `<input name="${fd.k}" value="${esc(v || '')}">`;
@@ -638,12 +733,13 @@ function openRecList(type) {
   if (type === 'advance') for (const r of advanceViews(S, today)) sub[r.id] = `balance ${fmt(r.balance, r.currency)} · paid ${fmt(r.paid, r.currency)} · received ${fmt(r.received, r.currency)}`;
   if (type === 'funding') for (const r of fundingViews(S, today)) sub[r.id] = `received ${fmt(r.received, r.currency)} of ${fmt(r.expected, r.currency)} · ${r.status}`;
   if (type === 'plan') for (const r of planViews(S)) sub[r.id] = `deposits ${fmt(r.deposits, r.currency)} · target ${fmt(r.target, r.currency)}`;
-  if (type === 'statement') for (const x of S.statements.filter(x => !x.deleted)) sub[x.id] = `${accById(x.card)?.name || 'card'} · due ${x.dueDate}`;
-  const budgets = type === 'budget' ? budgetViews(S, today).map(b => `<p class="muted"><b>${esc(b.name)}</b>: planned ${fmt(b.planned, b.currency)} · spent ${fmt(b.spent, b.currency)} · left ${fmt(b.left, b.currency)}</p>`).join('') : '';
+  if (type === 'statement') for (const x of S.statements.filter(x => !x.deleted)) sub[x.id] = `${accById(x.card)?.name || 'card'} · due ${toDMY(x.dueDate)}`;
+  const budgets = type === 'budget' ? budgetViews(S, today).map(b => `<p class="muted"><b>${esc(b.name)}</b>: planned ${fmt(b.planned, b.currency)} · spent ${fmt(b.spent, b.currency)} · left ${fmt(b.left, b.currency)} <button class="ghost" data-ledger="budget" data-id="${b.project}">Ledger</button></p>`).join('') : '';
   const cards = type === 'statement' ? cardViews(S, today).map(c => `<p class="muted"><b>${esc(c.name)}</b>: owed ${fmt(c.owed, c.currency)}</p>`).join('') : '';
-  const list = rows.map(r => `<button class="row" data-rec="${type}" data-id="${r.id}">
+  const list = rows.map(r => `<div class="ledger-row"><button class="row" data-rec="${type}" data-id="${r.id}">
       <div><b>${esc(r.name || r.division || r.card || '')}</b><small>${esc(sub[r.id] || (type === 'party' ? sub[r.name] : '') || (r.currency || ''))}</small></div>
-      <span>${type === 'budget' ? fmt(r.amount, projById(r.project)?.currency) : ''}</span></button>`).join('');
+      <span>${type === 'budget' ? fmt(r.amount, projById(r.project)?.currency) : ''}</span></button>
+      ${['advance', 'party', 'funding', 'plan', 'statement'].includes(type) ? `<div class="actions"><button class="ghost" data-ledger="${type}" data-id="${r.id}">Ledger</button></div>` : ''}</div>`).join('');
   $('#recBody').innerHTML = `<div class="split"><h2>${esc(R.title)}</h2></div>${budgets}${cards}
     ${list || '<p class="muted">Nothing yet.</p>'}
     <div class="actions"><button class="primary" data-rec-new="${type}">+ Add ${esc(R.label.toLowerCase())}</button></div>
@@ -688,8 +784,7 @@ async function saveRecForm(f) {
         if (n != null && (!Number.isInteger(n) || n < 1 || n > 31)) throw new Error('Day must be from 1 to 31');
         rec[fd.k] = n;
       } else if (fd.t === 'date') {
-        if (raw && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new Error('Dates must look like 2026-11-10');
-        rec[fd.k] = raw || null;
+        rec[fd.k] = raw.trim() ? fromDMY(raw) : null;
       } else {
         rec[fd.k] = String(raw).trim();
       }
@@ -723,11 +818,11 @@ function openReceipts(fundId) {
   if (!fund) return;
   const cur = projById(fund.project)?.currency;
   const linked = new Set(S.funding.filter(x => !x.deleted).flatMap(x => (x.receipts || []).map(r => r.entry)));
-  const used = (fund.receipts || []).map(r => `<div class="row"><div><b>${esc(S.txs.find(t => t.id === r.entry)?.category || 'Receipt')}</b><small>${esc(S.txs.find(t => t.id === r.entry)?.date || '')}</small></div>
+  const used = (fund.receipts || []).map(r => `<div class="row"><div><b>${esc(S.txs.find(t => t.id === r.entry)?.category || 'Receipt')}</b><small>${esc(toDMY(S.txs.find(t => t.id === r.entry)?.date || ''))}</small></div>
     <span>${fmt(r.amount, cur)} <button class="ghost" data-fund-unlink="${fund.id}" data-entry="${r.entry}">Remove</button></span></div>`).join('');
   const options = S.txs.filter(t => !t.deleted && t.type === 'income' && !linked.has(t.id) && projById(accById(t.account_id)?.project_id || t.project_id)?.id === fund.project)
     .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 200)
-    .map(t => `<option value="${t.id}" data-amount="${toPlain(t.amount, cur)}">${t.date} · ${esc(t.category || 'Income')} · ${toPlain(t.amount, cur)}</option>`).join('');
+    .map(t => `<option value="${t.id}" data-amount="${toPlain(t.amount, cur)}">${toDMY(t.date)} · ${esc(t.category || 'Income')} · ${toPlain(t.amount, cur)}</option>`).join('');
   $('#recBody').innerHTML = `<h2>Receipts for ${esc(fund.name)}</h2>
     <p class="muted">Expected ${fmt(fund.expected, cur)}. Link the income transactions that actually arrived.</p>
     ${used || '<p class="muted">No receipts linked yet.</p>'}
@@ -765,6 +860,7 @@ document.addEventListener('click', async e => {
   const row = t.closest('[data-rec]');
   if (row && !t.closest('[data-fund-unlink]')) return openRecForm(row.dataset.rec, row.dataset.id);
   if (t.dataset.recNew) return openRecForm(t.dataset.recNew);
+  if (t.dataset.ledger) return openLedger(t.dataset.ledger, t.dataset.id);
   if (t.dataset.recList) return openRecList(t.dataset.recList);
   if (t.dataset.recDel) return deleteRec(t.dataset.recDel, t.dataset.id);
   if (t.dataset.fundUnlink) {
@@ -878,13 +974,13 @@ function downloadBytes(name, bytes, type) {
 function exportJson() {
   const more = Object.fromEntries(RECORD_TABLES.map(t => [t, S[t]]));
   const bytes = new TextEncoder().encode(JSON.stringify(makeBackup(S.accounts, S.txs, S.projects, S.loans, more), null, 2));
-  downloadBytes(`dsi-wallet-backup-${todayStr()}.json`, bytes, 'application/json');
+  downloadBytes(`dsi-digital-backup-${todayStr()}.json`, bytes, 'application/json');
   setStatus('Backup file saved. Keep it somewhere safe.');
 }
 
 function exportCsv() {
   const txs = txsIn(S.txs, S.accounts, pid);
-  downloadBytes(`dsi-wallet-${pid === 'all' ? 'all' : projName(pid).replace(/\W+/g, '-')}-${todayStr()}.csv`,
+  downloadBytes(`dsi-digital-${pid === 'all' ? 'all' : projName(pid).replace(/\W+/g, '-')}-${todayStr()}.csv`,
     new TextEncoder().encode(toCSV(txs, S.accounts)), 'text/csv;charset=utf-8');
 }
 
@@ -936,8 +1032,8 @@ function openReport() {
   f.elements.kind.value = 'month';
   f.elements.month.value = today.slice(0, 7);
   f.elements.account_id.innerHTML = accOptions(liveAccounts()[0]?.id);
-  f.elements.from.value = `${today.slice(0, 4)}-01-01`;
-  f.elements.to.value = today;
+  f.elements.from.value = toDMY(`${today.slice(0, 4)}-01-01`);
+  f.elements.to.value = toDMY(today);
   toggleReportKind();
   $('#repError').textContent = '';
   $('#repDialog').showModal();
@@ -957,17 +1053,17 @@ function buildReport() {
     if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Choose a month.');
     return {
       bytes: monthlyPdf({ accounts: S.accounts.filter(a => pid === 'all' || a.project_id === pid), txs: txsIn(S.txs, S.accounts, pid), month, generated: today }),
-      name: `DSi-Wallet-statement-${pid === 'all' ? 'all' : projName(pid)}-${month}.pdf`.replace(/[^A-Za-z0-9._-]+/g, '-'),
+      name: `DSi-Digital-statement-${pid === 'all' ? 'all' : projName(pid)}-${month}.pdf`.replace(/[^A-Za-z0-9._-]+/g, '-'),
     };
   }
-  const accountId = f.elements.account_id.value, from = f.elements.from.value, to = f.elements.to.value;
+  const accountId = f.elements.account_id.value, from = fromDMY(f.elements.from.value), to = fromDMY(f.elements.to.value);
   const acc = accById(accountId);
   if (!acc) throw new Error('Choose an account.');
   if (!from || !to) throw new Error('Choose both dates.');
   if (from > to) throw new Error('The "From" date must be before the "To" date.');
   return {
     bytes: accountPdf({ accounts: S.accounts, txs: S.txs, accountId, from, to, generated: today }),
-    name: `DSi-Wallet-${acc.name}-${from}-to-${to}.pdf`.replace(/[^A-Za-z0-9._-]+/g, '-'),
+    name: `DSi-Digital-${acc.name}-${from}-to-${to}.pdf`.replace(/[^A-Za-z0-9._-]+/g, '-'),
   };
 }
 
@@ -1036,7 +1132,7 @@ async function notifyDues() {
     const key = `notified:${d.id}:${d.date}:${today}`;
     if (await getMeta(key)) continue;
     await setMeta(key, true);
-    new Notification('Payment due soon', { body: `${d.name}: ${fmt(d.amount, d.currency)} due ${d.date}`, icon: 'icon.svg', tag: key });
+    new Notification('Payment due soon', { body: `${d.name}: ${fmt(d.amount, d.currency)} due ${toDMY(d.date)}`, icon: 'icon.svg', tag: key });
   }
 }
 
@@ -1045,7 +1141,7 @@ function exportExcel(template) {
   try {
     if (!window.XLSX) throw new Error('The Excel library did not load. Check your connection and reload.');
     const data = template ? { projects: [], accounts: [], txs: [] } : { projects: S.projects, accounts: S.accounts, txs: S.txs };
-    downloadBytes(template ? 'DSi-Wallet-template.xlsx' : `DSi-Wallet-${todayStr()}.xlsx`, workbookBytes(window.XLSX, data),
+    downloadBytes(template ? 'DSi-Digital-template.xlsx' : `DSi-Digital-${todayStr()}.xlsx`, workbookBytes(window.XLSX, data),
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     setStatus(template ? 'Template saved.' : 'Excel file saved.');
   } catch (err) { setStatus('Excel export failed: ' + err.message); }
@@ -1152,6 +1248,7 @@ $('#main').addEventListener('click', async e => {
     case 'edit-tx': openTx(S.txs.find(t => t.id === id)); break;
     case 'edit-acc': openAcc(accById(id)); break;
     case 'open-loan': openLoan(id); break;
+    case 'open-od': openOd(id); break;
     case 'rec-list': openRecList(el.dataset.type); break;
     case 'new-acc': openAcc(); break;
     case 'edit-proj': openProj(projById(id)); break;
@@ -1177,8 +1274,10 @@ $('#main').addEventListener('change', e => {
   if (t.id === 'perMode') { period = { ...period, mode: t.value }; render(); }
   if (t.id === 'perMonth' && t.value) { period = { ...period, month: t.value }; render(); }
   if (t.id === 'perYear') { period = { ...period, year: t.value }; render(); }
-  if (t.id === 'perFrom' && t.value) { period = { ...period, from: t.value }; render(); }
-  if (t.id === 'perTo' && t.value) { period = { ...period, to: t.value }; render(); }
+  if (t.id === 'perFrom' || t.id === 'perTo') {
+    try { period = { ...period, [t.id === 'perFrom' ? 'from' : 'to']: fromDMY(t.value) }; render(); }
+    catch (err) { setStatus(err.message); }
+  }
   if (t.id === 'restoreFile' && t.files[0]) restore(t.files[0]);
   if (t.id === 'oldFile' && t.files[0]) { const f = t.files[0]; t.value = ''; chooseOldBackup(f); }
   if (t.id === 'xlsFile' && t.files[0]) { const f = t.files[0]; t.value = ''; chooseExcel(f); }
