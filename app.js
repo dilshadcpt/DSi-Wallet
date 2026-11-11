@@ -22,6 +22,8 @@ const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const todayStr = () => new Date().toLocaleDateString('en-CA');
 const dmy = iso => toDMY(iso);
+// Number only, with thousands separators and the currency's own decimals (BHD 3, INR and USD 2).
+const grp = (minor, cur) => fmt(minor, cur).replace(/^(−?)[^\d]*/, '$1');
 const shiftMonth = (m, n) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + n, 1)).toISOString().slice(0, 7); };
 
 const today = todayStr();
@@ -546,7 +548,7 @@ function openOd(id) {
   if (!acc || !acc.od) return;
   const cur = acc.currency, d = CURRENCIES[cur];
   const v = overdraftView(acc, S.projects, S.accounts, S.txs, today);
-  const money = x => fmt(Math.round(x * 10 ** d), '');
+  const money = x => grp(Math.round(x * 10 ** d), cur);
   const rows = v.segments.map(s => `<tr><td>${toDMY(s.from)}</td><td>${toDMY(s.to)}</td><td class="num">${s.days}</td><td class="num">${money(s.used)}</td><td class="num">${money(s.interest)}</td></tr>`).join('');
   $('#recBody').innerHTML = `
     <h2>${esc(acc.name)}</h2>
@@ -588,7 +590,7 @@ function openLedger(type, id) {
 function renderLedger() {
   const st = ledgerState;
   const L = ledgerFor(S, st.type, st.id, ledgerRange());
-  const dis = x => fmt(x, '');
+  const dis = x => grp(x, L?.currency || 'BHD');
   const head = L ? `${esc(L.title)} · ${L.currency}` : 'Record not found';
   const bodyRows = L ? L.rows.map(r => `<tr><td>${toDMY(r.date)}</td><td>${esc(r.desc)}</td><td class="num">${r.debit ? dis(r.debit) : ''}</td><td class="num">${r.credit ? dis(r.credit) : ''}</td><td class="num">${dis(r.balance)}</td></tr>`).join('') : '';
   $('#recBody').innerHTML = `
@@ -676,7 +678,7 @@ function openLoan(id) {
   const d = CURRENCIES[cur];
   const paidDates = new Set(S.txs.filter(t => !t.deleted && t.loan_id === id && t.due_date).map(t => t.due_date));
   const status = r => paidDates.has(r.date) ? ['Paid', 'status-paid'] : (r.date < today ? ['Overdue', 'status-overdue'] : ['Upcoming', 'status-up']);
-  const money = x => fmt(Math.round(x * 10 ** d), '');
+  const money = x => grp(Math.round(x * 10 ** d), cur);
   const rows = v.schedule.map(r => { const [label, cls] = status(r); return `<tr><td>${toDMY(r.date)}</td><td class="num">${money(r.payment)}</td><td class="num">${money(r.interest)}</td><td class="num">${money(r.principal)}</td><td class="num">${money(r.closing)}</td><td class="${cls}">${label}</td></tr>`; }).join('');
   $('#loanBody').innerHTML = `
     <p class="muted">${esc(projName(l.project))} · ${cur} · ${l.mode === 'emi' ? 'EMI ' + fmt(l.emi, cur) : 'no fixed schedule'}</p>
