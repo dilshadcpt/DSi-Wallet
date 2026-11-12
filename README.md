@@ -21,16 +21,9 @@ Keep the address; you need it in section 2. Install and Google sign-in both requ
 
 Your data is kept in the app's private Drive folder, which you cannot see in Drive itself. Only the app can read it.
 
-## 3. Payment reminders by Gmail
+## 3. Payment reminders
 
-Google does not let an app run on a schedule, so reminders are sent by a small Google script in your own account:
-
-1. Open **script.google.com**, click **New project**, delete the sample code and paste the contents of `dues-reminder.gs`.
-2. Click **Project Settings** (gear icon) and set **Time zone** to *Asia/Bahrain*.
-3. Choose the function `setupDailyReminder` from the top bar, click **Run**, and approve the permissions it asks for.
-4. Every morning at about 8am you will get an email if anything is due within 3 days or overdue. Gmail on your phone shows it as a notification.
-
-The script reads the small file `dues.json` that the app writes to a visible **DSi Wallet** folder in your Drive after each sync. Open the app and sync at least once after you set this up.
+Reminders go to email, WhatsApp and each PC or phone. The setup is in section 13.
 
 ## 4. Install on your PC and phone
 
@@ -80,3 +73,43 @@ Excel does not include parties, advances, funding, budgets, plans or card statem
 - Cross-currency transfers can be imported from the old app but not created in the form.
 - Google Drive sync, the Gmail reminder script and the hosting setup were built to match the old app's approach, but they have not yet been run on your own Google account. The first run is the real test.
 - The old app's PIN lock is not included.
+
+## 13. Payment reminders: email, WhatsApp and PC or phone
+
+Each channel is optional. Email needs only the Apps Script; the others need the steps below.
+
+**A. Email (already set up in section 3)**
+Run `setupDailyReminder` once in Apps Script. You get an email at about 8am when anything is overdue or due within 3 days.
+
+**B. PC and phone notifications (push)**
+1. **Make the keys.** Install Node.js from nodejs.org. Open a terminal and run `npx web-push generate-vapid-keys`. Save both keys somewhere private.
+2. **Put the public key in the app.** In `config.js`, set `vapidPublicKey` to the public key. Upload the file to GitHub, keeping your `googleClientId` in it.
+3. **Create the relay.** Sign up at cloudflare.com (free). Go to **Workers & Pages → Create → Worker**, name it `dsi-push-relay`, click **Edit code**, replace the code with `push-relay/worker.js`, and click **Deploy**.
+4. **Add the relay settings.** In the Worker, go to **Settings → Variables and secrets** and add:
+   - `VAPID_PUBLIC_KEY` (plain text): the public key
+   - `VAPID_PRIVATE_KEY` (secret): the private key
+   - `VAPID_SUBJECT` (plain text): `mailto:your-email@example.com`
+   - `RELAY_SECRET` (secret): a long random word or number of your choice
+5. **Tell Apps Script where the relay is.** In script.google.com, open the project, go to **Project Settings → Script properties** and add:
+   - `RELAY_URL`: the Worker's address, shown on its page (for example `https://dsi-push-relay.yourname.workers.dev`)
+   - `RELAY_SECRET`: the same value as in step 4
+6. **Turn it on for each device.** In the app, go to **More → Payment reminders → Turn on reminders on this device**. Connect Google Drive first. On a PC, use the installed app in Edge or Chrome, and keep background apps switched on in the browser settings. On iPhone, use the Home Screen app, iOS 16.4 or later.
+7. **Test it.** Press **Send a test notification** in the app. Then in Apps Script choose `sendDueReminders` and press **Run**.
+
+**C. WhatsApp (Meta's official WhatsApp Business API)**
+1. Go to developers.facebook.com, sign in, and create an app of type **Business**. Add the **WhatsApp** product. The API Setup page shows a test phone number, a **Phone number ID** and a temporary token. The temporary token expires after 24 hours; for a permanent token, create a System User in Meta Business Settings.
+2. In **WhatsApp Manager → Message templates**, create a template: category **Utility**, name `payment_reminder`, language English, body `Payment reminder: {{1}}`. Submit it and wait for approval.
+3. In the API Setup page, add your own WhatsApp number as a recipient and confirm the code WhatsApp sends you.
+4. In Apps Script, add these script properties:
+   - `WA_TOKEN`: the access token
+   - `WA_PHONE_ID`: the Phone number ID
+   - `WA_TO`: your number with the country code and no `+` or spaces (for example `97339123456`)
+5. Run `sendDueReminders` once to test.
+
+Check Meta's current pricing before you use WhatsApp for every day: test numbers are free to try, and live messages are billed by Meta.
+
+**Limits**
+- A PC or phone receives a notification only while its browser or phone is on and notifications are allowed.
+- Email and WhatsApp reach you even when your devices are off, but only if Apps Script runs and the message is delivered.
+- The reminder uses the data from the app's last sync, so sync after you change payments.
+- Reminders help you remember. They do not pay anything for you.

@@ -287,12 +287,21 @@ function moreView() {
       <p class="muted">The PIN locks the app screen on this device. It does not encrypt your data.</p>
     </section>
     <section>
+      <h2>Payment reminders</h2>
+      <p class="muted">Get a notification on this PC or phone when a payment is due, even when the app is closed. You can also get the same reminders on WhatsApp (README, section 13).</p>
+      <div class="actions wrap">
+        <button class="primary" data-act="rem-desktop">Turn on reminders on this device</button>
+        <button class="ghost" data-act="rem-test">Send a test notification</button>
+      </div>
+      <p id="remMsg" class="muted"></p>
+    </section>
+    <section>
       <h2>Google Drive</h2>
       <p id="syncMsg" class="muted">${driveState()}</p>
       <div class="actions wrap">
         ${token ? '<button class="primary" data-act="sync-now">Sync now</button>' : '<button class="primary" data-act="drive-connect">Connect Google Drive</button>'}
       </div>
-      <p class="muted">Your data is kept in the app's private Drive folder. Payment reminders are sent by Gmail, see README section 3.</p>
+      <p class="muted">Your data is kept in the app's private Drive folder. Payment reminders are explained in README, section 13.</p>
     </section>
     <section>
       <h2>Reports</h2>
@@ -1148,6 +1157,33 @@ async function confirmImport() {
   }
 }
 
+// ---------- Payment reminders on this device ----------
+const urlB64 = s => Uint8Array.from(atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+
+async function enableDesktopReminders() {
+  if (!cfg.vapidPublicKey) throw new Error('Reminders are not set up yet. Ask for the reminder setup (README, section 9).');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('This browser cannot receive reminders. On iPhone, add the app to your Home Screen first.');
+  if (!tokenValid() || !driveReady()) throw new Error('Connect Google Drive first (More → Google Drive), so the reminder service can find this device.');
+  if ((await Notification.requestPermission()) !== 'granted') throw new Error('Notifications were not allowed on this device.');
+  const reg = await navigator.serviceWorker.ready;
+  const sub = (await reg.pushManager.getSubscription()) ||
+    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64(cfg.vapidPublicKey) }));
+  const json = sub.toJSON();
+  const drive = driveClient(token.token);
+  const list = (await drive.readSubs()).filter(x => x.endpoint !== json.endpoint);
+  list.push({ endpoint: json.endpoint, keys: json.keys, device: navigator.userAgent.slice(0, 80), added: today });
+  await drive.writeSubs(list);
+  $('#remMsg').textContent = 'Reminders are on for this device. You will get a notification when a payment is due.';
+}
+
+async function testNotification() {
+  if (!('Notification' in window)) throw new Error('This browser cannot show notifications.');
+  if ((await Notification.requestPermission()) !== 'granted') throw new Error('Notifications were not allowed on this device.');
+  const reg = await navigator.serviceWorker.ready;
+  await reg.showNotification('DSi Digital', { body: 'Test notification. Payment reminders will look like this.', icon: 'icon.svg', tag: 'dsi-test' });
+  $('#remMsg').textContent = 'Test notification sent.';
+}
+
 // ---------- PIN lock ----------
 function showLock() {
   if (!pinRec) return;
@@ -1356,6 +1392,8 @@ $('#main').addEventListener('click', async e => {
     case 'edit-acc': openAcc(accById(id)); break;
     case 'open-loan': openLoan(id); break;
     case 'open-od': openOd(id); break;
+    case 'rem-desktop': enableDesktopReminders().catch(err => { $('#remMsg').textContent = err.message; }); break;
+    case 'rem-test': testNotification().catch(err => { $('#remMsg').textContent = err.message; }); break;
     case 'pin-set': openPinForm('set'); break;
     case 'pin-change': openPinForm('change'); break;
     case 'pin-remove': openPinForm('remove'); break;

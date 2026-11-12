@@ -7,6 +7,7 @@ export const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www
 export const DATA_FILE = 'dsi-wallet-data.json';
 export const DUES_FILE = 'dues.json';
 export const DUES_FOLDER = 'DSi Wallet';
+export const SUBS_FILE = 'subscriptions.json';
 export const TABLES = ['projects', 'accounts', 'loans', 'advances', 'funding', 'parties', 'budgets', 'plans', 'statements', 'transactions'];
 
 // Merges two copies of one table: newer updated_at wins per record. Deleted records stay as tombstones.
@@ -102,6 +103,8 @@ export function driveClient(token, fetchImpl = fetch) {
     readData: () => readJson(DATA_FILE, 'appDataFolder'),
     writeData: obj => writeJson(DATA_FILE, 'appDataFolder', null, obj),
     writeDues: async obj => writeJson(DUES_FILE, 'drive', await folder(DUES_FOLDER), obj),
+    readSubs: async () => (await readJson(SUBS_FILE, 'drive', await folder(DUES_FOLDER))) || [],
+    writeSubs: async list => writeJson(SUBS_FILE, 'drive', await folder(DUES_FOLDER), list),
   };
 }
 
