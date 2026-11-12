@@ -13,6 +13,7 @@ import { duesNow, advanceViews, fundingViews, budgetViews, planViews, partyViews
 import { loanSchedule } from './loan-math.js';
 import { toDMY, fromDMY, ALL_RANGE, monthRange, yearRange } from './format.js';
 import { ledgerFor } from './records.js';
+import { validPin, makePinRecord, checkPin, lockoutLeft, registerFailure } from './security.js';
 import { mergeState, duesFile, driveClient, getToken, localState, TABLES } from './drive-sync.js';
 
 const cfg = window.WALLET_CONFIG || {};
@@ -276,6 +277,14 @@ function moreView() {
       <div class="actions wrap">
         ${Object.entries(REC).map(([k, r]) => `<button class="ghost" data-act="rec-list" data-type="${k}">${esc(r.title)}</button>`).join('')}
       </div>
+    </section>
+    <section>
+      <h2>Security</h2>
+      <p class="muted">${pinRec ? 'A PIN is set on this device. The app asks for it when it opens and after a minute away.' : 'No PIN is set. Anyone with this device can open the app.'}</p>
+      <div class="actions wrap">${pinRec
+        ? '<button class="ghost" data-act="pin-change">Change PIN</button><button class="ghost" data-act="pin-remove">Remove PIN</button>'
+        : '<button class="primary" data-act="pin-set">Set a PIN</button>'}</div>
+      <p class="muted">The PIN locks the app screen on this device. It does not encrypt your data.</p>
     </section>
     <section>
       <h2>Google Drive</h2>
@@ -923,6 +932,19 @@ async function deleteProj() {
 const driveReady = () => !!cfg.googleClientId;
 const tokenValid = () => !!token && Date.now() < token.expires - 60000;
 
+let pinRec = null, locked = false, hiddenAt = 0, lockState = { fails: 0, until: 0 };
+
+async function loadSecurity() {
+  pinRec = (await getMeta('pin')) || null;
+  const saved = await getMeta('drive-token');
+  if (saved && saved.expires > Date.now() + 60000) token = saved;
+}
+
+async function setToken(t) {
+  token = t;
+  await setMeta('drive-token', t);
+}
+
 function scheduleSync() {
   if (!driveReady()) return;
   clearTimeout(syncTimer);
@@ -932,7 +954,7 @@ function scheduleSync() {
 // Connects this device to Google Drive. Must start from a tap, so Google can show its sign-in window.
 async function connectDrive() {
   if (!driveReady()) throw new Error('Google Drive is not set up yet. See README, section 2.');
-  token = await getToken(cfg.googleClientId);
+  await setToken(await getToken(cfg.googleClientId));
   await sync(true);
 }
 
@@ -940,7 +962,7 @@ async function sync(manual = false) {
   if (!driveReady()) { if (manual) setStatus('Google Drive is not set up yet. See README, section 2.'); return; }
   if (!navigator.onLine) { if (manual) setStatus('Offline. Changes will sync when you reconnect.'); return; }
   if (!tokenValid()) {
-    try { token = await getToken(cfg.googleClientId, { silent: !manual }); }
+    try { await setToken(await getToken(cfg.googleClientId, { silent: !manual })); }
     catch (_) { setStatus('Saved on this device. Open More and tap Sync now to send it to Google Drive.'); return; }
   }
   if (syncing) return;
@@ -1126,6 +1148,89 @@ async function confirmImport() {
   }
 }
 
+// ---------- PIN lock ----------
+function showLock() {
+  if (!pinRec) return;
+  locked = true;
+  $('#lock').hidden = false;
+  $('#lockPin').value = '';
+  $('#lockMsg').textContent = '';
+  setTimeout(() => $('#lockPin').focus(), 50);
+}
+
+function hideLock() {
+  locked = false;
+  $('#lock').hidden = true;
+}
+
+$('#lockForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const left = lockoutLeft(lockState);
+  if (left) { $('#lockMsg').textContent = `Too many tries. Wait ${Math.ceil(left / 1000)} seconds.`; return; }
+  const ok = await checkPin($('#lockPin').value, pinRec);
+  if (ok) {
+    lockState = { fails: 0, until: 0 };
+    hideLock();
+    notifyDues();
+  } else {
+    registerFailure(lockState);
+    $('#lockPin').value = '';
+    $('#lockMsg').textContent = lockoutLeft(lockState) ? 'Too many tries. Wait 30 seconds.' : 'Wrong PIN. Try again.';
+  }
+});
+
+// Forgot the PIN: signing in with your Google account proves it is you, then the PIN is removed.
+$('#lockForgot').onclick = async () => {
+  try {
+    if (!driveReady()) throw new Error('Google Drive is not set up on this device, so the PIN cannot be reset here.');
+    await setToken(await getToken(cfg.googleClientId));
+    await setMeta('pin', null);
+    pinRec = null; lockState = { fails: 0, until: 0 };
+    hideLock();
+    setStatus('PIN removed. You can set a new one in More → Security.');
+  } catch (err) {
+    $('#lockMsg').textContent = err.message;
+  }
+};
+
+function openPinForm(mode) {
+  $('#recBody').innerHTML = `
+    <form id="pinForm" class="stack" data-mode="${mode}">
+      <h2>${mode === 'set' ? 'Set a PIN' : mode === 'change' ? 'Change PIN' : 'Remove PIN'}</h2>
+      ${mode === 'set' ? '<p class="muted">Choose 4 to 6 digits. You will type it each time the app opens.</p>' : ''}
+      ${mode !== 'set' ? '<label>Current PIN<input name="current" type="password" inputmode="numeric" maxlength="6" required></label>' : ''}
+      ${mode !== 'remove' ? `<label>New PIN<input name="next" type="password" inputmode="numeric" maxlength="6" required></label>
+      <label>Type the new PIN again<input name="confirm" type="password" inputmode="numeric" maxlength="6" required></label>` : ''}
+      <p id="pinError" class="error" role="alert"></p>
+      <div class="actions"><button type="button" class="ghost" data-rec-close>Cancel</button><span class="grow"></span><button class="primary">Save</button></div>
+    </form>`;
+  $('#recDialog').dataset.type = 'pin';
+  $('#recDialog').showModal();
+}
+
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'pinForm') return;
+  e.preventDefault();
+  const f = e.target, mode = f.dataset.mode;
+  try {
+    if (mode !== 'set' && !(await checkPin(f.elements.current.value, pinRec))) throw new Error('That is not your current PIN.');
+    if (mode === 'remove') {
+      await setMeta('pin', null);
+      pinRec = null;
+    } else {
+      if (f.elements.next.value !== f.elements.confirm.value) throw new Error('The two PINs do not match.');
+      if (!validPin(f.elements.next.value)) throw new Error('The PIN must be 4 to 6 digits.');
+      pinRec = await makePinRecord(f.elements.next.value);
+      await setMeta('pin', pinRec);
+    }
+    $('#recDialog').close();
+    render();
+    setStatus(mode === 'remove' ? 'PIN removed.' : 'PIN saved on this device.');
+  } catch (err) {
+    f.querySelector('#pinError').textContent = err.message;
+  }
+});
+
 // ---------- Notifications inside the app ----------
 // One notification per payment per day, while the app is open.
 async function notifyDues() {
@@ -1251,6 +1356,9 @@ $('#main').addEventListener('click', async e => {
     case 'edit-acc': openAcc(accById(id)); break;
     case 'open-loan': openLoan(id); break;
     case 'open-od': openOd(id); break;
+    case 'pin-set': openPinForm('set'); break;
+    case 'pin-change': openPinForm('change'); break;
+    case 'pin-remove': openPinForm('remove'); break;
     case 'rec-list': openRecList(el.dataset.type); break;
     case 'new-acc': openAcc(); break;
     case 'edit-proj': openProj(projById(id)); break;
@@ -1295,11 +1403,17 @@ async function init() {
   $('#appTitle').textContent = APP;
   await loadAll();
   await migrate();
+  await loadSecurity();
   render();
-  notifyDues();
+  if (pinRec) showLock(); else notifyDues();
   setStatus(driveReady() ? 'This device · connect Google Drive in More' : 'This device only');
   window.addEventListener('online', () => sync());
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (pinRec && hiddenAt && Date.now() - hiddenAt > 60000) showLock();
+    hiddenAt = 0;
+    if (!locked) sync();
+  });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 }
 

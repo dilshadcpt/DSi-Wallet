@@ -1,6 +1,6 @@
 // Network-first for the app's own files, so updates arrive; cached copy when offline.
-const CACHE = 'dsi-wallet-v10';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'core.js', 'pdf.js', 'reports.js', 'import-old.js', 'excel.js', 'loan-math.js', 'accounting.js', 'loan-bridge.js', 'od-bridge.js', 'old-state.js', 'records.js', 'finance-math.js', 'debt-actions.js', 'advances.js', 'construction-funding.js', 'parties.js', 'drive-sync.js', 'format.js', 'vendor/xlsx.full.min.js', 'config.js', 'manifest.webmanifest', 'icon.svg'];
+const CACHE = 'dsi-wallet-v11';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'core.js', 'pdf.js', 'reports.js', 'import-old.js', 'excel.js', 'loan-math.js', 'accounting.js', 'loan-bridge.js', 'od-bridge.js', 'old-state.js', 'records.js', 'finance-math.js', 'debt-actions.js', 'advances.js', 'construction-funding.js', 'parties.js', 'drive-sync.js', 'format.js', 'security.js', 'vendor/xlsx.full.min.js', 'config.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(

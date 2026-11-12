@@ -188,6 +188,17 @@
     </div>
   </dialog>
 
+  <div id="lock" class="lock" hidden>
+    <form id="lockForm" class="lock-card">
+      <h2>DSi Digital</h2>
+      <p class="muted">Enter your PIN to open the app.</p>
+      <input id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="PIN" aria-label="PIN" required>
+      <p id="lockMsg" class="error" role="alert"></p>
+      <button class="primary">Unlock</button>
+      <button type="button" id="lockForgot" class="link">Forgot PIN? Sign in with Google to remove it</button>
+    </form>
+  </div>
+
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="config.js"></script>
   <script type="module" src="app.js"></script>

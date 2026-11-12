@@ -81,3 +81,8 @@ label input, label select { color:var(--ink); }
 .status-paid { color:var(--in); } .status-overdue { color:var(--out); font-weight:600; } .status-up { color:var(--muted); }
 .tbl th, .tbl td { white-space: nowrap; }
 #loanDialog, #recDialog { width: min(760px, calc(100vw - 24px)); }
+.lock { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:50; padding:16px; }
+.lock[hidden] { display:none !important; }
+.lock-card { width:min(340px,92vw); display:flex; flex-direction:column; gap:12px; background:#fff; padding:24px; border-radius:16px; box-shadow:0 10px 30px #0002; }
+.lock-card h2 { margin:0; color:var(--brand); }
+.lock-card input { font-size:20px; letter-spacing:.3em; text-align:center; }
